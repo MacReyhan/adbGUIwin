@@ -1,0 +1,61 @@
+:root {
+  font-family: "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+.container {
+  padding: 20px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  color: #60a5fa;
+}
+
+.section-card {
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #16213e;
+  border-radius: 12px;
+  border: 1px solid #0f3460;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.current-dpi {
+  margin-top: 8px;
+  color: #a78bfa;
+}
+
+.log-card {
+  background: #0d1117;
+}
+
+.log-output {
+  background: #0d1117;
+  color: #7ee787;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
