@@ -9,12 +9,18 @@ import {
   Title1,
   Subtitle2,
   Card,
-  Divider,
   Toast,
   Toaster,
   useToastController,
   useId,
   ToastTitle,
+  Menu,
+  MenuTrigger,
+  MenuPopover,
+  MenuList,
+  MenuItem,
+  Switch,
+  Label,
 } from "@fluentui/react-components";
 import {
   PhoneRegular,
@@ -22,7 +28,8 @@ import {
   DismissCircleRegular,
   ArrowDownloadRegular,
   ArrowSyncRegular,
-  SettingsRegular,
+  PowerRegular,
+  PlayRegular,
 } from "@fluentui/react-icons";
 
 function App() {
@@ -32,19 +39,35 @@ function App() {
   const [currentDpi, setCurrentDpi] = useState<string>("");
   const [log, setLog] = useState<string>("");
 
+  // Scrcpy settings
+  const [maxSize, setMaxSize] = useState("1920");
+  const [bitrate, setBitrate] = useState("8M");
+  const [maxFps, setMaxFps] = useState("60");
+  const [videoCodec, setVideoCodec] = useState("h264");
+  const [stayAwake, setStayAwake] = useState(true);
+  const [turnScreenOff, setTurnScreenOff] = useState(false);
+  const [disableScreensaver, setDisableScreensaver] = useState(true);
+  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [noAudio, setNoAudio] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
   const toasterId = useId("toaster");
   const { dispatchToast } = useToastController(toasterId);
 
-  const notify = (message: string) => {
+  const notify = (message: string, intent: "success" | "error" = "success") => {
     dispatchToast(
       <Toast>
         <ToastTitle>{message}</ToastTitle>
       </Toast>,
-      { intent: "success" }
+      { intent }
     );
   };
 
   const dpiPresets = ["320", "360", "400", "420", "440", "480", "560"];
+  const sizePresets = ["1024", "1280", "1600", "1920", "2560"];
+  const fpsPresets = ["30", "60", "90", "120"];
+  const bitratePresets = ["2M", "4M", "8M", "16M", "32M"];
+  const codecPresets = ["h264", "h265", "av1"];
 
   const loadDevices = async () => {
     try {
@@ -59,6 +82,9 @@ function App() {
       if (parsed.length > 0) {
         setSelectedDevice(parsed[0]);
         getDpi(parsed[0]);
+      } else {
+        setSelectedDevice("");
+        setCurrentDpi("");
       }
       setLog(output);
     } catch (e) {
@@ -70,73 +96,82 @@ function App() {
     try {
       const output: string = await invoke("adb_get_dpi", { serial });
       setCurrentDpi(output.trim());
-    } catch (e) {
+    } catch {
       setCurrentDpi("Unknown");
     }
   };
 
   const applyDPI = async () => {
-    if (!selectedDevice) {
-      notify("Select a device first");
-      return;
-    }
-    try {
-      await invoke("adb_set_dpi", { serial: selectedDevice, dpi });
-      notify(`DPI set to ${dpi}`);
-      getDpi(selectedDevice);
-    } catch (e) {
-      setLog("Error: " + e);
-    }
+    if (!selectedDevice) return notify("Select a device first", "error");
+    await invoke("adb_set_dpi", { serial: selectedDevice, dpi });
+    notify(`DPI set to ${dpi}`);
+    getDpi(selectedDevice);
   };
 
   const resetDPI = async () => {
-    if (!selectedDevice) {
-      notify("Select a device first");
-      return;
-    }
-    try {
-      await invoke("adb_reset_dpi", { serial: selectedDevice });
-      notify("DPI reset to default");
-      getDpi(selectedDevice);
-    } catch (e) {
-      setLog("Error: " + e);
-    }
+    if (!selectedDevice) return notify("Select a device first", "error");
+    await invoke("adb_reset_dpi", { serial: selectedDevice });
+    notify("DPI reset to default");
+    getDpi(selectedDevice);
   };
 
   const killADB = async () => {
-    try {
-      await invoke("adb_kill");
-      notify("ADB server killed");
-      setDevices([]);
-      setSelectedDevice("");
-    } catch (e) {
-      setLog("Error: " + e);
-    }
+    await invoke("adb_kill");
+    notify("ADB server killed");
+    setDevices([]);
+    setSelectedDevice("");
   };
 
   const installAPK = async () => {
-    if (!selectedDevice) {
-      notify("Select a device first");
-      return;
+    if (!selectedDevice) return notify("Select a device first", "error");
+
+    const file = await open({
+      multiple: false,
+      filters: [{ name: "APK", extensions: ["apk"] }],
+    });
+
+    if (file) {
+      setLog("Installing APK...");
+      const result: string = await invoke("adb_install", {
+        serial: selectedDevice,
+        path: file,
+      });
+      setLog(result);
+      notify("APK installed");
     }
+  };
+
+  const reboot = async (mode: string) => {
+    if (!selectedDevice) return notify("Select a device first", "error");
+    const result: string = await invoke("adb_reboot", {
+      serial: selectedDevice,
+      mode,
+    });
+    notify(result);
+  };
+
+  const startScrcpy = async () => {
+    if (!selectedDevice) return notify("Select a device first", "error");
 
     try {
-      const file = await open({
-        multiple: false,
-        filters: [{ name: "APK", extensions: ["apk"] }],
+      const result: string = await invoke("launch_scrcpy", {
+        serial: selectedDevice,
+        maxSize,
+        bitrate,
+        maxFps,
+        videoCodec,
+        stayAwake,
+        turnScreenOff,
+        disableScreensaver,
+        alwaysOnTop,
+        noAudio,
+        fullscreen,
       });
-
-      if (file) {
-        setLog("Installing APK...");
-        const result: string = await invoke("adb_install", {
-          serial: selectedDevice,
-          path: file,
-        });
-        setLog(result);
-        notify("APK installed successfully");
-      }
+      setLog(result);
+      notify("scrcpy launched");
     } catch (e) {
       setLog("Error: " + e);
+      notify("Failed to launch scrcpy", "error");
     }
   };
 
@@ -154,9 +189,7 @@ function App() {
 
       {/* ---- DEVICES ---- */}
       <Card className="section-card">
-        <Subtitle2>
-          <SettingsRegular /> Devices
-        </Subtitle2>
+        <Subtitle2>Devices</Subtitle2>
 
         <div className="row">
           <Dropdown
@@ -225,14 +258,110 @@ function App() {
           <Button
             icon={<ArrowResetRegular />}
             onClick={resetDPI}
-            appearance="secondary"
           >
             Reset DPI
           </Button>
         </div>
       </Card>
 
-      <Divider />
+      {/* ---- SCRCPY SETTINGS ---- */}
+      <Card className="section-card">
+        <Subtitle2>Scrcpy Settings</Subtitle2>
+
+        <div className="settings-grid">
+          <div className="setting-item">
+            <Label>Max Size</Label>
+            <Dropdown
+              value={maxSize}
+              onOptionSelect={(_, data) => setMaxSize(data.optionValue ?? "1920")}
+            >
+              {sizePresets.map((s) => (
+                <Option key={s} value={s}>{s}</Option>
+              ))}
+            </Dropdown>
+          </div>
+
+          <div className="setting-item">
+            <Label>Bitrate</Label>
+            <Dropdown
+              value={bitrate}
+              onOptionSelect={(_, data) => setBitrate(data.optionValue ?? "8M")}
+            >
+              {bitratePresets.map((b) => (
+                <Option key={b} value={b}>{b}</Option>
+              ))}
+            </Dropdown>
+          </div>
+
+          <div className="setting-item">
+            <Label>Max FPS</Label>
+            <Dropdown
+              value={maxFps}
+              onOptionSelect={(_, data) => setMaxFps(data.optionValue ?? "60")}
+            >
+              {fpsPresets.map((f) => (
+                <Option key={f} value={f}>{f}</Option>
+              ))}
+            </Dropdown>
+          </div>
+
+          <div className="setting-item">
+            <Label>Video Codec</Label>
+            <Dropdown
+              value={videoCodec}
+              onOptionSelect={(_, data) => setVideoCodec(data.optionValue ?? "h264")}
+            >
+              {codecPresets.map((c) => (
+                <Option key={c} value={c}>{c}</Option>
+              ))}
+            </Dropdown>
+          </div>
+        </div>
+
+        <div className="switch-grid">
+          <Switch
+            checked={stayAwake}
+            onChange={(_, data) => setStayAwake(data.checked)}
+            label="Stay Awake"
+          />
+          <Switch
+            checked={disableScreensaver}
+            onChange={(_, data) => setDisableScreensaver(data.checked)}
+            label="Disable Screensaver"
+          />
+          <Switch
+            checked={turnScreenOff}
+            onChange={(_, data) => setTurnScreenOff(data.checked)}
+            label="Turn Screen Off"
+          />
+          <Switch
+            checked={alwaysOnTop}
+            onChange={(_, data) => setAlwaysOnTop(data.checked)}
+            label="Always On Top"
+          />
+          <Switch
+            checked={noAudio}
+            onChange={(_, data) => setNoAudio(data.checked)}
+            label="No Audio"
+          />
+          <Switch
+            checked={fullscreen}
+            onChange={(_, data) => setFullscreen(data.checked)}
+            label="Fullscreen"
+          />
+        </div>
+
+        <div className="row">
+          <Button
+            icon={<PlayRegular />}
+            appearance="primary"
+            onClick={startScrcpy}
+            size="large"
+          >
+            Launch scrcpy
+          </Button>
+        </div>
+      </Card>
 
       {/* ---- ACTIONS ---- */}
       <Card className="section-card">
@@ -247,10 +376,26 @@ function App() {
             Install APK
           </Button>
 
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <Button icon={<PowerRegular />}>
+                Reboot
+              </Button>
+            </MenuTrigger>
+
+            <MenuPopover>
+              <MenuList>
+                <MenuItem onClick={() => reboot("normal")}>Normal</MenuItem>
+                <MenuItem onClick={() => reboot("recovery")}>Recovery</MenuItem>
+                <MenuItem onClick={() => reboot("bootloader")}>Bootloader</MenuItem>
+                <MenuItem onClick={() => reboot("fastboot")}>Fastboot</MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+
           <Button
             icon={<DismissCircleRegular />}
             onClick={killADB}
-            appearance="secondary"
           >
             Kill ADB
           </Button>
