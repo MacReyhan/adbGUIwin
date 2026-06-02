@@ -63,7 +63,7 @@ function App() {
     );
   };
 
-  const dpiPresets = ["320", "360", "400", "420", "440", "480", "560"];
+  const dpiPresets = ["200", "280", "320", "360", "400", "420", "440", "480", "560"];
   const sizePresets = ["1024", "1280", "1600", "1920", "2560"];
   const fpsPresets = ["30", "60", "90", "120"];
   const bitratePresets = ["2M", "4M", "8M", "16M", "32M"];

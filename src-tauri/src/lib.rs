@@ -3,11 +3,13 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 fn get_binary_path(app: &tauri::AppHandle, name: &str) -> PathBuf {
-    app.path()
-        .resource_dir()
-        .expect("failed to get resource dir")
-        .join("binaries")
-        .join(name)
+    if let Ok(res_dir) = app.path().resource_dir() {
+        let path = res_dir.join("binaries").join(name);
+        if path.exists() {
+            return path;
+        }
+    }
+    PathBuf::from(name)
 }
 
 #[tauri::command]
@@ -39,7 +41,7 @@ fn adb_reset_dpi(app: tauri::AppHandle, serial: String) -> String {
         .args(["-s", &serial, "shell", "wm", "density", "reset"])
         .output();
     match output {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
+        Ok(_) => "DPI reset success".to_string(),
         Err(e) => format!("Error: {}", e),
     }
 }
@@ -61,7 +63,7 @@ fn adb_kill(app: tauri::AppHandle) -> String {
     let adb = get_binary_path(&app, "adb.exe");
     let output = Command::new(adb).arg("kill-server").output();
     match output {
-        Ok(o) => String::from_utf8_lossy(&o.stdout).to_string(),
+        Ok(_) => "ADB killed".to_string(),
         Err(e) => format!("Error: {}", e),
     }
 }
@@ -86,11 +88,9 @@ fn adb_install(app: tauri::AppHandle, serial: String, path: String) -> String {
 fn adb_reboot(app: tauri::AppHandle, serial: String, mode: String) -> String {
     let adb = get_binary_path(&app, "adb.exe");
     let mut args = vec!["-s", &serial, "reboot"];
-
     if mode != "normal" {
         args.push(&mode);
     }
-
     let output = Command::new(adb).args(&args).output();
     match output {
         Ok(_) => format!("Rebooting to {}...", mode),
@@ -115,6 +115,10 @@ fn launch_scrcpy(
 ) -> String {
     let scrcpy = get_binary_path(&app, "scrcpy.exe");
 
+    if !scrcpy.exists() {
+        return format!("Error: scrcpy.exe not found at {:?}", scrcpy);
+    }
+
     let mut args: Vec<String> = vec![
         "-s".to_string(), serial,
         format!("--video-codec={}", video_codec),
@@ -131,11 +135,9 @@ fn launch_scrcpy(
     if no_audio { args.push("--no-audio".to_string()); }
     if fullscreen { args.push("--fullscreen".to_string()); }
 
-    let result = Command::new(scrcpy).args(&args).spawn();
-
-    match result {
-        Ok(_) => format!("scrcpy launched with: {}", args.join(" ")),
-        Err(e) => format!("Error launching scrcpy: {}", e),
+    match Command::new(scrcpy).args(&args).spawn() {
+        Ok(_) => "scrcpy launched successfully".to_string(),
+        Err(e) => format!("Failed to spawn scrcpy: {}", e),
     }
 }
 
