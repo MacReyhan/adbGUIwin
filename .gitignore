@@ -85,3 +85,4 @@ logs/
 *.pem
 coverage/
 .nyc_output/
+adbGUIwin.code-workspace
