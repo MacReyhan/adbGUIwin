@@ -1,4 +1,4 @@
-```markdown
+
 ---
 name: 🐛 Bug Report
 about: Report a problem with the app
@@ -28,4 +28,4 @@ If applicable, add screenshots.
 
 ## 📋 Additional Context
 Anything else?
-```
+

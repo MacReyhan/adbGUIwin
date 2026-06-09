@@ -1,4 +1,4 @@
-```markdown
+
 ---
 name: 💡 Feature Request
 about: Suggest a new feature or improvement
@@ -17,4 +17,3 @@ Explain the use case.
 
 ## 📋 Additional Context
 Add screenshots, links, or examples.
-```
