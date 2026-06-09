@@ -9,56 +9,49 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     permissions:
       contents: write
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v3
         with:
           version: 9
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
+      - name: Cache Rust
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install frontend dependencies
-        run: pnpm install
+      - name: Show files (debug)
+        run: |
+          Get-Location
+          Get-ChildItem
+          Get-Content package.json
+        shell: pwsh
 
-      - name: Build Tauri app
+      - name: Install deps
+        run: pnpm install --no-frozen-lockfile
+        shell: pwsh
+
+      - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'ADB Manager ${{ github.ref_name }}'
-          releaseBody: |
-            ## ADB Manager ${{ github.ref_name }}
-            
-            ### 📥 Downloads
-            - **`.msi`** — Windows installer (recommended)
-            - **`.exe`** — NSIS setup installer
-            
-            ### ✨ Features
-            - ADB device manager
-            - DPI control
-            - APK installer
-            - Scrcpy with custom settings
-            - Reboot menu
-            
-            Bundled with ADB + scrcpy — no extra installs needed!
+          releaseBody: 'See assets to download and install.'
           releaseDraft: false
           prerelease: false
