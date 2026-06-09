@@ -1,6 +1,5 @@
 # 📁 `README.md`
 
-```markdown
 <div align="center">
 
 # 📱 ADB Manager
@@ -217,4 +216,3 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 [⬆ Back to top](#-adb-manager)
 
 </div>
-```
