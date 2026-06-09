@@ -81,3 +81,28 @@ body {
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
 }
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.path-item {
+  margin: 12px 0;
+  padding: 10px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+}
+
+.path-item .row {
+  margin: 8px 0;
+}
+
+.rotation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}

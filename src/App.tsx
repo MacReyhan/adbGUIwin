@@ -21,6 +21,7 @@ import {
   MenuItem,
   Switch,
   Label,
+  Spinner,
 } from "@fluentui/react-components";
 import {
   PhoneRegular,
@@ -30,6 +31,8 @@ import {
   ArrowSyncRegular,
   PowerRegular,
   PlayRegular,
+  SettingsRegular,
+  FolderRegular,
 } from "@fluentui/react-icons";
 
 function App() {
@@ -38,6 +41,14 @@ function App() {
   const [dpi, setDpi] = useState<string>("420");
   const [currentDpi, setCurrentDpi] = useState<string>("");
   const [log, setLog] = useState<string>("");
+
+  // Paths
+  const [adbPath, setAdbPath] = useState<string>("");
+  const [scrcpyPath, setScrcpyPath] = useState<string>("");
+  const [adbInstalled, setAdbInstalled] = useState<boolean>(false);
+  const [scrcpyInstalled, setScrcpyInstalled] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [downloading, setDownloading] = useState<string>("");
 
   // Scrcpy settings
   const [maxSize, setMaxSize] = useState("1920");
@@ -56,18 +67,27 @@ function App() {
 
   const notify = (message: string, intent: "success" | "error" = "success") => {
     dispatchToast(
-      <Toast>
-        <ToastTitle>{message}</ToastTitle>
-      </Toast>,
+      <Toast><ToastTitle>{message}</ToastTitle></Toast>,
       { intent }
     );
   };
 
-  const dpiPresets = ["200", "280", "320", "360", "400", "420", "440", "480", "560"];
+  const dpiPresets = ["200",  "280", "320", "360", "400", "420", "440", "480", "560"];
   const sizePresets = ["1024", "1280", "1600", "1920", "2560"];
   const fpsPresets = ["30", "60", "90", "120"];
   const bitratePresets = ["2M", "4M", "8M", "16M", "32M"];
   const codecPresets = ["h264", "h265", "av1"];
+
+  const checkPaths = async () => {
+    const adb: string = await invoke("get_adb_path");
+    const scrcpy: string = await invoke("get_scrcpy_path");
+    setAdbPath(adb);
+    setScrcpyPath(scrcpy);
+    const adbOk: boolean = await invoke("check_adb_installed");
+    const scrcpyOk: boolean = await invoke("check_scrcpy_installed");
+    setAdbInstalled(adbOk);
+    setScrcpyInstalled(scrcpyOk);
+  };
 
   const loadDevices = async () => {
     try {
@@ -77,7 +97,6 @@ function App() {
         .filter((line) => line.includes("device"))
         .map((line) => line.split("\t")[0].trim())
         .filter((s) => s.length > 0);
-
       setDevices(parsed);
       if (parsed.length > 0) {
         setSelectedDevice(parsed[0]);
@@ -88,7 +107,7 @@ function App() {
       }
       setLog(output);
     } catch (e) {
-      setLog("Error loading devices: " + e);
+      setLog("Error: " + e);
     }
   };
 
@@ -124,12 +143,10 @@ function App() {
 
   const installAPK = async () => {
     if (!selectedDevice) return notify("Select a device first", "error");
-
     const file = await open({
       multiple: false,
       filters: [{ name: "APK", extensions: ["apk"] }],
     });
-
     if (file) {
       setLog("Installing APK...");
       const result: string = await invoke("adb_install", {
@@ -150,9 +167,21 @@ function App() {
     notify(result);
   };
 
+  const rotateScreen = async (direction: string) => {
+    if (!selectedDevice) return notify("Select a device first", "error");
+    try {
+      const result: string = await invoke("rotate_screen", {
+        serial: selectedDevice,
+        direction,
+      });
+      notify(result);
+    } catch (e) {
+      notify("Rotation failed: " + e, "error");
+    }
+  };
+
   const startScrcpy = async () => {
     if (!selectedDevice) return notify("Select a device first", "error");
-
     try {
       const result: string = await invoke("launch_scrcpy", {
         serial: selectedDevice,
@@ -170,27 +199,126 @@ function App() {
       setLog(result);
       notify("scrcpy launched");
     } catch (e) {
-      setLog("Error: " + e);
-      notify("Failed to launch scrcpy", "error");
+      notify("Failed: " + e, "error");
+    }
+  };
+
+  const downloadADB = async () => {
+    setDownloading("adb");
+    try {
+      const result: string = await invoke("download_adb");
+      notify(result);
+      await invoke("set_adb_path", { path: "C:\\Android\\platform-tools\\adb.exe" });
+      await checkPaths();
+    } catch (e) {
+      notify("Download failed: " + e, "error");
+    }
+    setDownloading("");
+  };
+
+  const downloadScrcpy = async () => {
+    setDownloading("scrcpy");
+    try {
+      const result: string = await invoke("download_scrcpy");
+      notify(result);
+      await invoke("set_scrcpy_path", { path: "C:\\Android\\scrcpy\\scrcpy.exe" });
+      await checkPaths();
+    } catch (e) {
+      notify("Download failed: " + e, "error");
+    }
+    setDownloading("");
+  };
+
+  const browseADB = async () => {
+    const file = await open({
+      multiple: false,
+      filters: [{ name: "Executable", extensions: ["exe"] }],
+    });
+    if (file) {
+      await invoke("set_adb_path", { path: file });
+      await checkPaths();
+      notify("ADB path updated");
+    }
+  };
+
+  const browseScrcpy = async () => {
+    const file = await open({
+      multiple: false,
+      filters: [{ name: "Executable", extensions: ["exe"] }],
+    });
+    if (file) {
+      await invoke("set_scrcpy_path", { path: file });
+      await checkPaths();
+      notify("scrcpy path updated");
     }
   };
 
   useEffect(() => {
-    loadDevices();
+    checkPaths().then(() => loadDevices());
   }, []);
 
   return (
     <div className="container">
       <Toaster toasterId={toasterId} />
 
-      <Title1 className="title">
-        <PhoneRegular fontSize={28} /> ADB Manager
-      </Title1>
+      {/* ---- HEADER ---- */}
+      <div className="header">
+        <Title1 className="title">
+          <PhoneRegular fontSize={28} /> ADB Manager
+        </Title1>
+        <Button
+          icon={<SettingsRegular />}
+          appearance="subtle"
+          onClick={() => setShowSettings(!showSettings)}
+        >
+          Settings
+        </Button>
+      </div>
+
+      {/* ---- SETTINGS PANEL ---- */}
+      {showSettings && (
+        <Card className="section-card">
+          <Subtitle2>Binary Paths</Subtitle2>
+          <div className="path-item">
+            <Label>ADB: {adbInstalled ? "✅" : "❌ Not found"}</Label>
+            <div className="row">
+              <Input value={adbPath} readOnly style={{ flex: 1 }} />
+              <Button icon={<FolderRegular />} onClick={browseADB}>Browse</Button>
+            </div>
+            {!adbInstalled && (
+              <Button
+                appearance="primary"
+                onClick={downloadADB}
+                disabled={downloading === "adb"}
+                icon={downloading === "adb" ? <Spinner size="tiny" /> : <ArrowDownloadRegular />}
+              >
+                {downloading === "adb" ? "Downloading..." : "Download ADB to C:\\Android\\"}
+              </Button>
+            )}
+          </div>
+          <div className="path-item">
+            <Label>scrcpy: {scrcpyInstalled ? "✅" : "❌ Not found"}</Label>
+            <div className="row">
+              <Input value={scrcpyPath} readOnly style={{ flex: 1 }} />
+              <Button icon={<FolderRegular />} onClick={browseScrcpy}>Browse</Button>
+            </div>
+            {!scrcpyInstalled && (
+              <Button
+                appearance="primary"
+                onClick={downloadScrcpy}
+                disabled={downloading === "scrcpy"}
+                icon={downloading === "scrcpy" ? <Spinner size="tiny" /> : <ArrowDownloadRegular />}
+              >
+                {downloading === "scrcpy" ? "Downloading..." : "Download scrcpy to C:\\Android\\"}
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* ---- DEVICES ---- */}
       <Card className="section-card">
         <Subtitle2>Devices</Subtitle2>
-
         <div className="row">
           <Dropdown
             placeholder="Select Device"
@@ -202,72 +330,65 @@ function App() {
             }}
             style={{ flex: 1 }}
           >
-            {devices.map((device) => (
-              <Option key={device} value={device}>
-                {device}
-              </Option>
+            {devices.map((d) => (
+              <Option key={d} value={d}>{d}</Option>
             ))}
           </Dropdown>
-
-          <Button
-            icon={<ArrowSyncRegular />}
-            onClick={loadDevices}
-            appearance="subtle"
-          >
+          <Button icon={<ArrowSyncRegular />} onClick={loadDevices} appearance="subtle">
             Refresh
           </Button>
         </div>
-
         {currentDpi && (
-          <Subtitle2 className="current-dpi">
-            Current: {currentDpi}
-          </Subtitle2>
+          <Subtitle2 className="current-dpi">Current DPI: {currentDpi}</Subtitle2>
         )}
       </Card>
 
       {/* ---- DPI ---- */}
       <Card className="section-card">
         <Subtitle2>DPI Settings</Subtitle2>
-
         <div className="row">
           <Dropdown
-            placeholder="Select DPI"
             value={dpi}
             onOptionSelect={(_, data) => setDpi(data.optionValue ?? "420")}
           >
-            {dpiPresets.map((preset) => (
-              <Option key={preset} value={preset}>
-                {preset}
-              </Option>
+            {dpiPresets.map((p) => (
+              <Option key={p} value={p}>{p}</Option>
             ))}
           </Dropdown>
-
           <Input
             value={dpi}
             onChange={(_, data) => setDpi(data.value)}
-            placeholder="Custom DPI"
             style={{ width: 100 }}
           />
         </div>
-
         <div className="row">
-          <Button appearance="primary" onClick={applyDPI}>
-            Apply DPI
-          </Button>
+          <Button appearance="primary" onClick={applyDPI}>Apply DPI</Button>
+          <Button icon={<ArrowResetRegular />} onClick={resetDPI}>Reset DPI</Button>
+        </div>
+      </Card>
 
-          <Button
-            icon={<ArrowResetRegular />}
-            onClick={resetDPI}
-          >
-            Reset DPI
+      {/* ---- SCREEN ROTATION ---- */}
+      <Card className="section-card">
+        <Subtitle2>Screen Rotation</Subtitle2>
+        <div className="rotation-grid">
+          <Button appearance="primary" onClick={() => rotateScreen("portrait")}>
+            ⬆️ Portrait (0°)
+          </Button>
+          <Button appearance="primary" onClick={() => rotateScreen("landscape_left")}>
+            ⬅️ Landscape Left (90°)
+          </Button>
+          <Button appearance="primary" onClick={() => rotateScreen("landscape_right")}>
+            ➡️ Landscape Right (270°)
+          </Button>
+          <Button appearance="primary" onClick={() => rotateScreen("upside_down")}>
+            ⬇️ Upside Down (180°)
           </Button>
         </div>
       </Card>
 
-      {/* ---- SCRCPY SETTINGS ---- */}
+      {/* ---- SCRCPY ---- */}
       <Card className="section-card">
         <Subtitle2>Scrcpy Settings</Subtitle2>
-
         <div className="settings-grid">
           <div className="setting-item">
             <Label>Max Size</Label>
@@ -280,7 +401,6 @@ function App() {
               ))}
             </Dropdown>
           </div>
-
           <div className="setting-item">
             <Label>Bitrate</Label>
             <Dropdown
@@ -292,7 +412,6 @@ function App() {
               ))}
             </Dropdown>
           </div>
-
           <div className="setting-item">
             <Label>Max FPS</Label>
             <Dropdown
@@ -304,9 +423,8 @@ function App() {
               ))}
             </Dropdown>
           </div>
-
           <div className="setting-item">
-            <Label>Video Codec</Label>
+            <Label>Codec</Label>
             <Dropdown
               value={videoCodec}
               onOptionSelect={(_, data) => setVideoCodec(data.optionValue ?? "h264")}
@@ -317,47 +435,16 @@ function App() {
             </Dropdown>
           </div>
         </div>
-
         <div className="switch-grid">
-          <Switch
-            checked={stayAwake}
-            onChange={(_, data) => setStayAwake(data.checked)}
-            label="Stay Awake"
-          />
-          <Switch
-            checked={disableScreensaver}
-            onChange={(_, data) => setDisableScreensaver(data.checked)}
-            label="Disable Screensaver"
-          />
-          <Switch
-            checked={turnScreenOff}
-            onChange={(_, data) => setTurnScreenOff(data.checked)}
-            label="Turn Screen Off"
-          />
-          <Switch
-            checked={alwaysOnTop}
-            onChange={(_, data) => setAlwaysOnTop(data.checked)}
-            label="Always On Top"
-          />
-          <Switch
-            checked={noAudio}
-            onChange={(_, data) => setNoAudio(data.checked)}
-            label="No Audio"
-          />
-          <Switch
-            checked={fullscreen}
-            onChange={(_, data) => setFullscreen(data.checked)}
-            label="Fullscreen"
-          />
+          <Switch checked={stayAwake} onChange={(_, d) => setStayAwake(d.checked)} label="Stay Awake" />
+          <Switch checked={disableScreensaver} onChange={(_, d) => setDisableScreensaver(d.checked)} label="No Screensaver" />
+          <Switch checked={turnScreenOff} onChange={(_, d) => setTurnScreenOff(d.checked)} label="Screen Off" />
+          <Switch checked={alwaysOnTop} onChange={(_, d) => setAlwaysOnTop(d.checked)} label="Always On Top" />
+          <Switch checked={noAudio} onChange={(_, d) => setNoAudio(d.checked)} label="No Audio" />
+          <Switch checked={fullscreen} onChange={(_, d) => setFullscreen(d.checked)} label="Fullscreen" />
         </div>
-
         <div className="row">
-          <Button
-            icon={<PlayRegular />}
-            appearance="primary"
-            onClick={startScrcpy}
-            size="large"
-          >
+          <Button icon={<PlayRegular />} appearance="primary" onClick={startScrcpy} size="large">
             Launch scrcpy
           </Button>
         </div>
@@ -366,23 +453,14 @@ function App() {
       {/* ---- ACTIONS ---- */}
       <Card className="section-card">
         <Subtitle2>Actions</Subtitle2>
-
         <div className="row">
-          <Button
-            icon={<ArrowDownloadRegular />}
-            onClick={installAPK}
-            appearance="primary"
-          >
+          <Button icon={<ArrowDownloadRegular />} onClick={installAPK} appearance="primary">
             Install APK
           </Button>
-
           <Menu>
             <MenuTrigger disableButtonEnhancement>
-              <Button icon={<PowerRegular />}>
-                Reboot
-              </Button>
+              <Button icon={<PowerRegular />}>Reboot</Button>
             </MenuTrigger>
-
             <MenuPopover>
               <MenuList>
                 <MenuItem onClick={() => reboot("normal")}>Normal</MenuItem>
@@ -392,13 +470,7 @@ function App() {
               </MenuList>
             </MenuPopover>
           </Menu>
-
-          <Button
-            icon={<DismissCircleRegular />}
-            onClick={killADB}
-          >
-            Kill ADB
-          </Button>
+          <Button icon={<DismissCircleRegular />} onClick={killADB}>Kill ADB</Button>
         </div>
       </Card>
 
