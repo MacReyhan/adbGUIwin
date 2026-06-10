@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::fs;
 use std::io::Write;
 use std::sync::Mutex;
-use tauri::Manager;
 
 // Global state for ADB path
 struct AppState {

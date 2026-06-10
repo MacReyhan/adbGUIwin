@@ -5,26 +5,32 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.0)'
+        required: true
+        default: '0.2.0'
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     permissions:
       contents: write
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: 'pnpm'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -34,24 +40,51 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Show files (debug)
-        run: |
-          Get-Location
-          Get-ChildItem
-          Get-Content package.json
-        shell: pwsh
-
       - name: Install deps
         run: pnpm install --no-frozen-lockfile
+
+      - name: Determine version
+        id: version
         shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "tag=v${{ github.event.inputs.version }}" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+            "version=${{ github.event.inputs.version }}" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+          } else {
+            "tag=${{ github.ref_name }}" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+            $ver = "${{ github.ref_name }}" -replace '^v', ''
+            "version=$ver" | Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8
+          }
 
       - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
+        run: pnpm tauri build
+
+      - name: Create Release with Artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          release_name: 'ADB Manager ${{ steps.version.outputs.tag }}'
+          body: |
+            ## 📥 Downloads
+
+            - **`.msi`** — Windows MSI installer (recommended)
+            - **`.exe`** — NSIS setup installer
+
+            ## ✨ What's Included
+
+            - ADB device manager with multi-device support
+            - DPI control (presets + custom)
+            - APK installer
+            - Scrcpy with full settings panel
+            - Reboot menu (Normal/Recovery/Bootloader/Fastboot)
+            - Smart binary detection (uses system ADB)
+
+            ---
+            Built with Tauri 2 + React
+          draft: false
+          prerelease: false
+          files: |
+            src-tauri/target/release/bundle/msi/ADB Manager_${{ steps.version.outputs.version }}_x64_en-US.msi
+            src-tauri/target/release/bundle/nsis/ADB Manager_${{ steps.version.outputs.version }}_x64-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'ADB Manager ${{ github.ref_name }}'
-          releaseBody: 'See assets to download and install.'
-          releaseDraft: false
-          prerelease: false
