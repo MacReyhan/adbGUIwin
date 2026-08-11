@@ -61,6 +61,9 @@ function App() {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [noAudio, setNoAudio] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [newDisplayEnabled, setNewDisplayEnabled] = useState(false);
+  const [newDisplayResolution, setNewDisplayResolution] = useState("1080p");
+  const [customNewDisplay, setCustomNewDisplay] = useState("1920x1080");
 
   const toasterId = useId("toaster");
   const { dispatchToast } = useToastController(toasterId);
@@ -77,6 +80,13 @@ function App() {
   const fpsPresets = ["30", "60", "90", "120"];
   const bitratePresets = ["2M", "4M", "8M", "16M", "32M"];
   const codecPresets = ["h264", "h265", "av1"];
+  const newDisplayPresets = [
+    { label: "720p (1280x720)", value: "720p" },
+    { label: "1080p (1920x1080)", value: "1080p" },
+    { label: "2K (2560x1440)", value: "2k" },
+    { label: "Auto (Default)", value: "auto" },
+    { label: "Custom", value: "custom" },
+  ];
 
   const checkPaths = async () => {
     const adb: string = await invoke("get_adb_path");
@@ -195,6 +205,9 @@ function App() {
         alwaysOnTop,
         noAudio,
         fullscreen,
+        newDisplayEnabled,
+        newDisplayResolution,
+        newDisplayCustom: customNewDisplay,
       });
       setLog(result);
       notify("scrcpy launched");
@@ -442,7 +455,33 @@ function App() {
           <Switch checked={alwaysOnTop} onChange={(_, d) => setAlwaysOnTop(d.checked)} label="Always On Top" />
           <Switch checked={noAudio} onChange={(_, d) => setNoAudio(d.checked)} label="No Audio" />
           <Switch checked={fullscreen} onChange={(_, d) => setFullscreen(d.checked)} label="Fullscreen" />
+          <Switch checked={newDisplayEnabled} onChange={(_, d) => setNewDisplayEnabled(d.checked)} label="New Display (--new-display)" />
         </div>
+        {newDisplayEnabled && (
+          <div className="settings-grid" style={{ marginTop: "12px" }}>
+            <div className="setting-item">
+              <Label>Virtual Display Resolution</Label>
+              <Dropdown
+                value={newDisplayPresets.find((p) => p.value === newDisplayResolution)?.label || newDisplayResolution}
+                onOptionSelect={(_, data) => setNewDisplayResolution(data.optionValue ?? "1080p")}
+              >
+                {newDisplayPresets.map((p) => (
+                  <Option key={p.value} value={p.value}>{p.label}</Option>
+                ))}
+              </Dropdown>
+            </div>
+            {newDisplayResolution === "custom" && (
+              <div className="setting-item">
+                <Label>Custom Resolution (e.g. 1920x1080)</Label>
+                <Input
+                  value={customNewDisplay}
+                  onChange={(_, data) => setCustomNewDisplay(data.value)}
+                  placeholder="1920x1080"
+                />
+              </div>
+            )}
+          </div>
+        )}
         <div className="row">
           <Button icon={<PlayRegular />} appearance="primary" onClick={startScrcpy} size="large">
             Launch scrcpy

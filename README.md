@@ -40,6 +40,7 @@
 
 ### 🎮 Scrcpy Screen Mirroring
 Full settings panel with:
+- 📺 Virtual Display support (`--new-display=720p | 1080p | 2k | custom`)
 - 📐 Max resolution (1024 → 2560)
 - 🎬 Video codec (h264 / h265 / av1)
 - 📊 Bitrate control (2M → 32M)

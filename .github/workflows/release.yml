@@ -75,7 +75,7 @@ jobs:
             - ADB device manager with multi-device support
             - DPI control (presets + custom)
             - APK installer
-            - Scrcpy with full settings panel
+            - Scrcpy with full settings panel & Virtual Display (`--new-display` 720p/1080p/2k)
             - Reboot menu (Normal/Recovery/Bootloader/Fastboot)
             - Smart binary detection (uses system ADB)
 

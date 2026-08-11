@@ -294,6 +294,9 @@ fn launch_scrcpy(
     always_on_top: bool,
     no_audio: bool,
     fullscreen: bool,
+    new_display_enabled: bool,
+    new_display_resolution: String,
+    new_display_custom: String,
 ) -> String {
     let scrcpy = state.scrcpy_path.lock().unwrap().clone();
 
@@ -312,6 +315,25 @@ fn launch_scrcpy(
     if always_on_top { args.push("--always-on-top".to_string()); }
     if no_audio { args.push("--no-audio".to_string()); }
     if fullscreen { args.push("--fullscreen".to_string()); }
+
+    if new_display_enabled {
+        let flag = match new_display_resolution.as_str() {
+            "720p" => "--new-display=1280x720".to_string(),
+            "1080p" => "--new-display=1920x1080".to_string(),
+            "2k" => "--new-display=2560x1440".to_string(),
+            "auto" => "--new-display".to_string(),
+            "custom" => {
+                let trimmed = new_display_custom.trim();
+                if !trimmed.is_empty() {
+                    format!("--new-display={}", trimmed)
+                } else {
+                    "--new-display".to_string()
+                }
+            }
+            _ => "--new-display".to_string(),
+        };
+        args.push(flag);
+    }
 
     match Command::new(scrcpy).args(&args).spawn() {
         Ok(_) => "scrcpy launched successfully".to_string(),
